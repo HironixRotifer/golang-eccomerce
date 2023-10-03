@@ -86,7 +86,7 @@ func SingUp() gin.HandlerFunc {
 		}
 
 		password := HashPassword(*user.Password)
-		token, refreshtoken, _ := tokens.TokenGenerator(*user.Email, *user.First_Name, *user.Last_Name, *&user.User_ID)
+		token, refreshtoken, _ := tokens.TokenGenerator(*user.Email, *user.First_Name, *user.Last_Name, user.User_ID)
 
 		user.ID = primitive.NewObjectID()
 		user.User_ID = user.ID.Hex()
@@ -115,6 +115,8 @@ func SingUp() gin.HandlerFunc {
 func Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var user models.User
+		var foundUser models.User
+
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
@@ -141,19 +143,34 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		token, refreshToken, _ := tokens.TokenGenerator(*foundUser.Email, *foudUser.First_Name, *foudUser.Last_Name, *foudUser.User_id)
+		token, refreshToken, _ := tokens.TokenGenerator(*foundUser.Email, *foundUser.First_Name, *foundUser.Last_Name, foundUser.User_ID)
 
 		defer cancel()
 
-		tokens.UpdateAllTokens(token, refreshToken, foudUser.User_ID)
-		c.JSON(http.StatusFound, foudUser)
+		tokens.UpdateAllTokens(token, refreshToken, foundUser.User_ID)
+		c.JSON(http.StatusFound, foundUser)
 
 	}
 }
 
-func productViewerAdmin() gin.HandlerFunc {
+func ProductViewerAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		var products models.Product
+		defer cancel()
+		if err := c.BindJSON(&products); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		products.Product_ID = primitive.NewObjectID()
+		_, anyerr := ProductCollection.InsertOne(ctx, products)
+		if anyerr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "not inserted"})
+			return
+		}
 
+		defer cancel()
+		c.JSON(http.StatusOK, "Seccessfully added")
 	}
 }
 
